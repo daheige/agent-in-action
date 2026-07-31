@@ -54,6 +54,75 @@ agent-in-action/
 
 ---
 
+## 本地部署 Ollama
+
+如果你不想使用第三方 LLM 厂商的 API Key，可以直接在本地部署 Ollama 作为 Provider。Ollama 提供与 OpenAI 兼容的 `/v1/chat/completions` 接口，`llm-gateway` 已内置默认地址 `http://localhost:11434/v1`。
+
+### 1. 安装 Ollama
+
+访问官网下载对应系统的安装包：
+
+- 官网：https://ollama.com
+- macOS 也可以使用 Homebrew：
+
+```bash
+brew install ollama
+```
+
+### 2. 启动 Ollama 服务
+
+安装完成后，启动 Ollama 服务（默认监听 `127.0.0.1:11434`）：
+
+```bash
+ollama serve
+```
+
+> 提示：在 macOS 上，通过官方安装包启动后，Ollama 通常会作为后台服务运行；如果命令行提示端口被占用，说明服务已经启动。
+
+### 3. 拉取模型
+
+例如拉取 `qwen2.5` 模型（约 4.7GB，请确保磁盘空间充足）：
+
+```bash
+ollama pull qwen2.5
+```
+
+其他常用模型：`llama3`、`deepseek-r1:8b`、`gemma2` 等，可在 [Ollama Library](https://ollama.com/library) 查看。
+
+### 4. 验证本地服务
+
+```bash
+curl http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2.5",
+    "messages": [{"role": "user", "content": "你好"}]
+  }'
+```
+
+如果能正常返回模型回复，说明本地 Ollama 部署成功。
+
+### 5. 在 llm-gateway 中使用
+
+进入 `llm-gateway` 目录，复制并编辑 `.env`：
+
+```bash
+cd llm-gateway
+cp .env.example .env
+```
+
+在 `.env` 中配置 Ollama 相关环境变量（`OLLAMA_API_KEY` 可留空）：
+
+```bash
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_API_KEY=
+OLLAMA_MODEL=qwen2.5
+```
+
+然后即可通过 `make run` 或 `make run-web` 使用本地模型。
+
+---
+
 ## 快速开始
 
 ### 进入 llm-gateway 子项目
