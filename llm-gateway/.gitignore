@@ -1,0 +1,5 @@
+.env
+bin/llm-gateway
+bin/llm-gateway-web
+*.exe
+*.log
