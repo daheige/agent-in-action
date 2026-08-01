@@ -1,9 +1,10 @@
 # agent-in-action
 
-`agent-in-action` 是一个用于学习和实践 AI Agent 相关技术的 Go 语言笔记仓库。当前主要包含两个子项目：
+`agent-in-action` 是一个用于学习和实践 AI Agent 相关技术的 Go 语言笔记仓库。当前主要包含三个子项目：
 
 - **`llm-demo`**：通过原生 `curl` 演示如何直接调用不同 LLM 厂商的 API，并对比它们的请求格式差异。
 - **`llm-gateway`**：一个基于 Go 标准库实现的 LLM 统一接入网关，封装多家厂商 API 差异，支持故障转移、路由策略、流式输出和成本统计。
+- **`prompt`**：Prompt 工程与上下文工程笔记，覆盖消息角色设计、Few-shot / CoT / ReAct / RAG 演进、提示词模板、Token 预算与 Prompt Caching 等内容。
 
 ---
 
@@ -13,6 +14,7 @@
 agent-in-action/
 ├── llm-demo/          # 原生 HTTP 调用 LLM 的示例与笔记
 ├── llm-gateway/       # LLM 统一接入网关（CLI + HTTP Server）
+├── prompt/            # Prompt 工程与上下文工程笔记
 ├── go.mod             # Go 模块定义
 ├── go.sum             # 依赖校验
 └── readme.md          # 本文件
@@ -44,6 +46,22 @@ agent-in-action/
 - 零外部生产依赖（仅 `godotenv` 用于本地 `.env` 加载）
 
 详情见 [`llm-gateway/README.md`](llm-gateway/README.md)。
+
+## prompt
+
+`prompt` 是一份面向工程实践的 Prompt 工程笔记，帮助理解如何设计、组织和约束发给 LLM 的输入，以及如何在 Agent 运行期治理上下文。
+
+核心内容：
+
+- 消息角色与职责分离：System / User / Assistant / Tool
+- Prompt 工程演进：Zero-shot、Few-shot、Chain-of-Thought、ReAct、RAG
+- 好 Prompt 的特征与常见反模式
+- Prompt Engineering vs Context Engineering vs Fine-tuning 的决策树
+- 使用 Go 标准库 `text/template` 维护提示词模板
+- 上下文窗口、Token 估算与 Token 预算分配
+- Prompt Caching 的排列原则与上下文工程治理手段
+
+详情见 [`prompt/readme.md`](prompt/readme.md)。
 
 ---
 
