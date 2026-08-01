@@ -2,6 +2,9 @@
 
 `llm-gateway` 是一个基于 Go 标准库实现的 LLM 统一接入网关。它以统一的抽象层封装多家大模型厂商的 API 差异，提供故障转移、成本/延迟路由、流式输出、用量统计和结构化 JSON Schema 生成等能力。
 
+该 `llm-gateway` 项目仅供学习和研究ai llm gateway 使用。如果您需要在生产环境中使用 ai llm gateway 网关接入，推荐使用：https://github.com/daheige/hermes-ai
+
+ai llm gateway 整体架构设计如下：
 ![provider.png](provider.png)
 
 ---
