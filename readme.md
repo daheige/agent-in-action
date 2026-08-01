@@ -161,10 +161,98 @@ make run-web
 - 安装：https://www.kimi.com/code?from=kimi_homepage_sidebar
 - 文档：https://www.kimi.com/code/docs/
 
+脚本安装（推荐）macOS / Linux：
 ```shell
 curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash
 ```
+npm 安装（需要 Node.js 22.19.0 或更高版本）
+```shell
+node --version
+npm install -g @moonshot-ai/kimi-code
+```
+或用 pnpm：
+```shell
+pnpm add -g @moonshot-ai/kimi-code
+```
+升级：运行 `kimi upgrade`，CLI 会检查最新版本并展示更新选项。选择 Install update now 后根据当前安装来源执行升级；也可以直接用包管理器：
+```shell
+npm install -g @moonshot-ai/kimi-code@latest
+```
+卸载：脚本安装的用户删除 kimi 可执行文件即可；npm 安装的用户：
+```shell
+npm uninstall -g @moonshot-ai/kimi-code
+```
 
-### DeepSeek API
+Kimi Code CLI 是一个运行在终端中的 AI Agent，帮助你完成软件开发任务和日常的终端操作——阅读和修改代码、执行 Shell 命令、搜索文件、抓取网页，并在执行过程中根据反馈自主规划和调整下一步行动。
+
+它适用于以下场景：
+
+- 编写和修改代码：实现新功能、修复 bug、完成重构
+- 理解项目：探索陌生的代码库，解答架构和实现层面的问题
+- 自动化任务：批量处理文件、运行构建与测试、串联多个脚本
+- 整套 CLI 以 TypeScript 编写，通过 npm 分发，运行在 Node.js 之上。
+
+#### kimi 接入
+- API 接入：将 Kimi Code 接入第三方开发工具时，需要手动配置 API Key 完成认证。
+- 服务地址：Kimi Code API 同时兼容 OpenAI 和 Anthropic 两种协议。不同工具对地址配置的要求不同：
+    - Base URL：部分工具（如 Claude Code）只需填写 Base URL，工具会自动拼接后续路径。
+    - 完整 Endpoint：部分工具（如 Trae）需要填写完整的 API 请求地址。
+
+按需选择对应的地址：
+| 协议           | Base URL                         | 常用 Endpoint 示例                                    |
+| ------------ | -------------------------------- | ------------------------------------------------- |
+| OpenAI 兼容    | <https://api.kimi.com/coding/v1> | <https://api.kimi.com/coding/v1/chat/completions> |
+| Anthropic 兼容 | <https://api.kimi.com/coding/>   | <https://api.kimi.com/coding/v1/messages>         |
+
+- 模型 ID：不同模型 ID 对应不同的会员档位与上下文窗口，具体权益见 会员权益。
+
+| Model ID                  | 说明                                                                                                                                              |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| k3                        | Kimi K3，Moderato 及以上会员可调用，Allegretto 及以上会员可解锁最高 100 万上下文；支持 low / high / max 三档思考强度，适合大型代码库分析、多文件重构、超长文档处理等长上下文任务。                              |
+| k3-256k                   | Kimi K3 256K 上下文版，Moderato 及以上会员可调用；支持 low / high / max 三档思考强度。256k 上下文内效果与 K3 相同，k3（1M）消耗约为 k3-256k 两倍，适合日常问答、代码补全、常规功能开发、单文件或少量文件修场景，不支持视频输入。 |
+| kimi-for-coding           | Kimi K2.7 Code，所有会员可用。                                                                                                                          |
+| kimi-for-coding-highspeed | Kimi K2.7 Code 高速版，Allegretto 及以上会员可用。                                                                                                          |
+- 获取 API Key：Kimi 会员可在 Kimi Code 控制台 创建和管理（最多 5 个，仅创建时显示一次，请妥善保存）
+
+## kimi cli
+首次启动时需要配置 API 来源。在交互界面中输入 /login 进入登录流程
+```shell
+/login
+```
+/login 会弹出平台选择器，支持两种方式：
+- Kimi Code（OAuth） — 验证码流程，在任意设备打开链接、登录并输入验证码即可授权
+- Kimi Platform API 密钥 — 输入来自 platform.kimi.com 或 platform.kimi.ai 的 API 密钥
+- 需要退出登录时，输入 /logout 清除当前凭证。
+
+### 常用命令与快捷键速查
+第一次使用时，记住下面这些就够了：
+
+会话相关命令
+| 命令        | 说明               |
+| --------- | ---------------- |
+| /new 或 /clear     | 开启新会话，清空当前上下文    |
+| /sessions 或 /resume | 浏览历史会话，选择恢复      |
+| /model    | 切换当前使用的模型        |
+| /compact  | 手动压缩上下文，释放 token |
+| /fork     | 派生当前会话，保留历史独立继续  |
+| /init    —    | 分析当前代码库并生成 AGENTS.md |
+| /web    —    | 在 web UI 中打开当前会话：选择一个运行中的实例进行连接，或在 TUI 退出后新开一个前台服务器。参见 kimi web：https://www.kimi.com/code/docs/kimi-code-cli/reference/kimi-command.html#kimi-web |
+| fork        | 基于当前会话 fork 一份新会话，保留完整对话历史 |
+| /tasks 或 /task    |     浏览后台任务列表    |
+| /export    | 将当前会话导出为 Markdown 文件 |
+| /exit    或 /quit 或 /q    | 退出 Kimi Code CLI    |
+
+最常用快捷键
+| 快捷键       | 说明               |
+| --------- | ---------------- |
+| Esc       | 中断流式输出 / 关闭弹窗    |
+| Ctrl-C    | 中断输出；空闲时连按两次退出   |
+| Shift-Tab | 切换 Plan 模式       |
+| Ctrl-S    | 输出中途插入消息，无需等待结束  |
+| Ctrl-O    | 折叠 / 展开工具输出和压缩摘要 |
+
+想看完整列表，输入 /help 或访问：https://www.kimi.com/code/docs/kimi-code-cli/reference/slash-commands.html
+
+## DeepSeek API
 
 - 文档：https://api-docs.deepseek.com/zh-cn/
