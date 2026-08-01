@@ -113,6 +113,15 @@ RAG 和工具调用把模型从“只靠参数知识回答”扩展到“看着�
 | 上下文显式 | 不依赖模型猜隐含前提                      |
 | 可测试   | 用真实样例回归，而不是写完就上线                |
 
+反过来，新手常见错误也很固定。
+| 错误         | 例子                  | 改法                      |
+| ---------- | ------------------- | ----------------------- |
+| 指令抽象       | "用专业语气回答"           | "用工程师交流时的中性语气，避免感叹号"    |
+| System 堆太多 | "友好、准确、简洁、专业、同理心……" | 只保留最重要的 2-3 条，用示例补足风格   |
+| 没有边界       | 只说该做什么              | 加上"资料没有时说资料未涵盖"         |
+| 让模型猜格式     | "把答案给我"             | 给出 JSON 字段或 Markdown 模板 |
+| 不做回归       | 写完一次就上线             | 准备真实样例集，修改 prompt 后重复验证 |
+
 ## Prompt、Context 与 Fine-tuning
 Prompt Engineering、Context Engineering、Fine-tuning 经常被混在一起。它们解决的是不同层面的问题。
 | 维度   | Prompt Engineering | Context Engineering | Fine-tuning    |
@@ -165,3 +174,162 @@ Prompt Engineering、Context Engineering、Fine-tuning 经常被混在一起。�
 例如可以要求“只返回 JSON，不要添加解释文字”，并固定字段为 level 与 reason，其中 level 只能取 low | medium | high，reason 用一句话说明判断依据。
 
 有原生结构化输出能力的平台，优先使用原生能力；没有时，仍要在提示词中给出结构，并在代码里做解析失败重试。
+
+## 提示词模板 
+提示词不应该通过字符串拼接来维护。规则、资料、示例、变量混在字符串拼接里，容易出错，也很难测试。Go 标准库的 text/template 足够支撑大部分提示词模板。
+
+```go
+package prompt
+
+import (
+	"bytes"
+	"text/template"
+)
+
+type Template struct {
+	tmpl *template.Template
+}
+
+// New 创建一个模版实例
+func New(name, text string) (*Template, error) {
+	// missingkey=error：引用了未提供的变量时直接报错，而不是静默渲染成 <no value>。
+	t, err := template.New(name).Option("missingkey=error").Parse(text)
+	if err != nil {
+		return nil, err
+	}
+	return &Template{tmpl: t}, nil
+}
+
+// Render 模版渲染
+func (t *Template) Render(data any) (string, error) {
+	var buf bytes.Buffer
+	if err := t.tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+```
+用它构造一个文档助手的系统提示词。
+```go
+const docAssistantTmpl = `你是 {{.Product}} 的文档助手。
+
+规则：
+- 只依据下方「资料」回答，不编造；资料里没有就明确说"资料未涵盖"。
+- 回答简洁、准确，涉及操作时给出清晰步骤。
+
+资料：
+{{range .Docs}}- {{.}}
+{{end}}
+示例（学习这种语气和结构）：
+用户：如何修改默认超时？
+助手：在配置文件里设置 timeout 字段即可，单位为秒，默认 30。需要我给出完整示例吗？`
+
+tmpl, _ := prompt.New("doc", docAssistantTmpl)
+sys, _ := tmpl.Render(map[string]any{
+	"Product": "示例网关",
+	"Docs":    []string{"timeout 默认 30 秒", "支持 YAML / 环境变量两种配置方式"},
+})
+// sys 可作为 System 消息
+```
+上面代码中的 missingkey=error 很重要。提示词变量缺失时，如果静默渲染成 <no value>，模型行为会变得很难排查。模板渲染阶段就报错，能把问题尽早暴露。
+
+## 上下文窗口与 Token
+要管好上下文，先要理解它的物理约束。模型一次能处理的文本量有上限，叫上下文窗口，单位是 token。输入和输出共同占用窗口，也都会影响成本和延迟。
+
+大模型支持的上下文窗口越来越大，不代表可以把所有内容都塞进去。我们应该建立准确的心智：上下文不是仓库，而是工作台。工作台上应该摆当前任务最需要的材料，而不是把整个仓库都搬上来。
+
+长上下文会带来两类问题。
+
+第一，注意力被稀释。上下文越长，关键信息越可能被无关内容淹没。模型对中间位置的信息利用也可能不稳定。
+
+第二，成本和延迟上升。每个输入 token 都要处理，输出 token 通常更贵。把大段历史、工具结果和检索片段每轮都带上，会快速增加成本。
+
+一次模型调用的上下文通常由这些部分组成。
+```ini
+一次模型调用的上下文 =
+   System 提示词（角色/规则）
+ + 工具定义（每个工具的名字、描述、Schema）
+ + 对话历史（过往消息、工具调用与结果）
+ + 检索到的知识片段（RAG）
+ + 当前用户输入
+ ```
+ ![context](context.png)
+ 估算 token 不需要一开始就做的很精确，有一个大概量级感更重要。下面是一个够用的粗略估算函数。
+ ```go
+ // 一个够用的粗略估算：英文约 4 字符/token，中文约 1.5~2 字符/token。
+func estimateTokens(s string) int {
+	ascii, cjk := 0, 0
+	for _, r := range s {
+		if r < 128 {
+			ascii++
+		} else {
+			cjk++
+		}
+	}
+	return ascii/4 + cjk*2/3 + 1
+}
+```
+这个函数只用于建立预算意识。真实工程中，不同模型 tokenizer 不同，本地估算只能作为守门参考；最终计费和精确 token 数应以 Provider 返回的 usage 或平台 tokenizer 为准。
+
+## Token 预算
+有了“注意力预算”的心智，下一步是把它变成可操作的编码规则：给上下文的每一部分划定预算上限。
+```go
+// Budget 描述一次调用里各部分的 token 预算上限。
+type Budget struct {
+	Total        int // 可用窗口，已预留输出余量
+	SystemPrompt int // 系统提示词
+	Tools        int // 工具定义
+	History      int // 对话历史
+	Retrieved    int // 检索片段
+}
+
+// 例：8K 可用窗口的一种分配。
+var demo = Budget{
+	Total:        8000,
+	SystemPrompt: 800,
+	Tools:        1200,
+	History:      3000,
+	Retrieved:    2500,
+}
+```
+![context-rule.png](context-rule.png)
+预算的意义不在数字多精确，而在强制你为每部分划界。没有预算意识的 Agent，会把历史、工具结果、检索片段一路堆到爆窗口；有预算意识的 Agent，会在历史超标时压缩，在检索片段过多时 rerank 或减少 top-k，在工具定义过多时动态裁剪。
+
+这里要区分两类预算。
+
+- 本文讲的是单次调用的上下文预算：一次请求里各部分摆多少。
+- 一次任务最多跑几步、累计消耗多少 token、何时停止。
+
+前者负责“每次喂给模型什么”，后者负责“整个任务别失控”。
+
+## Prompt Caching
+上下文里有一大块内容通常每次调用都差不多：System 提示词、工具定义、结构化输出 Schema、few-shot 示例、稳定资料摘要。Prompt Caching 的基本思路，就是让这些重复前缀在后续请求中更快、更便宜地被处理。
+
+不同平台对 Prompt Caching 的触发方式、缓存时长和价格策略不同，具体以官方文档为准。但工程原则基本一致：缓存命中依赖稳定前缀。
+```ini
+[System 提示词]        ← 最稳定，放最前
+[工具定义]             ← 较稳定
+[稳定知识 / few-shot]   ← 较稳定
+────────────────────
+[对话历史]              ← 每轮变化，放后面
+[当前用户输入]          ← 每次都变，放最后
+```
+![prompt-cache](prompt-cache.png)
+如果在 System 最前面插一个每次变化的时间戳，例如 当前时间：2026-06-02 10:30:01，前缀从开头就不同，后面的稳定内容也很难命中缓存。动态信息应该尽量放到后面，并和稳定指令分开。
+
+Prompt Caching 主要省的是成本和延迟，不是上下文本身的 token 数。即使命中缓存，模型仍然要在本次调用中处理上下文语义。要减少上下文占用，还需要历史压缩、工具结果外置和动态工具暴露等手段。
+
+## 上下文工程全景
+本文建立的是上下文工程的基础心智：消息设计、提示词模板、注意力预算、token 预算和缓存顺序。真实平台跑起来后，上下文会以各种方式膨胀，需要主动治理。
+| 手段             | 作用                    |
+| -------------- | --------------------- |
+| 历史压缩           | 长对话逼近窗口时，把较早内容总结成摘要   |
+| Tool Result 压缩 | 工具或检索返回大段结果时，只保留要点    |
+| 文件系统作外部记忆      | 大块内容外置到文件，上下文只留摘要和引用  |
+| 动态工具暴露         | 按当前任务只暴露相关工具，治理工具定义膨胀 |
+| 结构化笔记          | 把关键状态写入外部笔记，下一轮快速恢复   |
+| 子 Agent 隔离     | 把复杂子任务交给隔离上下文的子 Agent |
+| Citations      | 引用源文档而不是重新生成原文        |
+
+这些手段的共同原则是：常驻上下文里只放当前任务必需的、结论性的内容；过程性的、可按需取回的内容放到外部。
+

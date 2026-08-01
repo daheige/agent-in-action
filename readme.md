@@ -235,8 +235,8 @@ Kimi Code CLI 是一个运行在终端中的 AI Agent，帮助你完成软件开
 | /model    | 切换当前使用的模型        |
 | /compact  | 手动压缩上下文，释放 token |
 | /fork     | 派生当前会话，保留历史独立继续  |
-| /init    —    | 分析当前代码库并生成 AGENTS.md |
-| /web    —    | 在 web UI 中打开当前会话：选择一个运行中的实例进行连接，或在 TUI 退出后新开一个前台服务器。参见 kimi web：https://www.kimi.com/code/docs/kimi-code-cli/reference/kimi-command.html#kimi-web |
+| /init     | 分析当前代码库并生成 AGENTS.md |
+| /web      | 在 web UI 中打开当前会话：选择一个运行中的实例进行连接，或在 TUI 退出后新开一个前台服务器。参见 kimi web：https://www.kimi.com/code/docs/kimi-code-cli/reference/kimi-command.html#kimi-web |
 | fork        | 基于当前会话 fork 一份新会话，保留完整对话历史 |
 | /tasks 或 /task    |     浏览后台任务列表    |
 | /export    | 将当前会话导出为 Markdown 文件 |
