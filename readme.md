@@ -105,10 +105,78 @@ ollama serve
 ollama pull qwen2.5
 ```
 
-其他常用模型：`llama3`、`deepseek-r1:8b`、`gemma2` 等，可在 [Ollama Library](https://ollama.com/library) 查看。
+其他常用模型：`llama3`、`deepseek-r1:8b`、`gemma2`、`qwen3.5:9b` 等，可在 [Ollama Library](https://ollama.com/library) 查看。
+
+### qwen3.5:9b
+获取 qwen3.5:9b模型：https://ollama.com/library/qwen3.5
+```shell
+ollama pull qwen3.5:9b
+```
+qwen3.5:9b 在 Ollama 上默认是 Q4 量化版，模型文件约 6 GB。内存需求如下：
+| 场景               | 需求                                |
+| ---------------- | --------------------------------- |
+| 最低可跑（Q4，默认上下文）   | **8 GB 显存**，或 8–10 GB 系统内存（纯 CPU） |
+| 舒适体验（Q4，长上下文/多轮） | 10–12 GB 显存                       |
+| Q8 量化（质量更好）      | 模型约 10 GB，建议 12–16 GB 显存          |
+
+几个说明：
+- 显存不够会自动用内存补：Ollama 会把放不下的层卸载到 CPU 内存，能跑但速度明显下降。比如 6 GB 显存的卡跑 9B，大约一半在显卡一半在内存。
+- 上下文长度影响大：Ollama 默认上下文 4K 没问题；如果你调大 num_ctx（Qwen3.5 原生支持 256K），KV cache 会额外吃掉几个 GB。可以设环境变量 OLLAMA_KV_CACHE_TYPE=q8_0 把 KV 缓存占用减半。
+- 跑 RAG 的话再加一点：embedding 模型（nomic-embed-text ~270MB / bge-m3 ~1.2GB）会同时驻留内存，建议在此基础上多留 1–2 GB。
+
+一句话：8 GB 显存的显卡（如 RTX 4060/3070）跑 qwen3.5:9b 是正好的档位；只有 16 GB 内存、没有独显的笔记本也能跑，速度大概是每秒十几个 token。
+
+### qwen3.5:4b
+qwen3.5:4b（也就是 ollama run qwen3.5 默认拉取的档位）Q4 量化后模型文件约 3 GB。
+| 场景             | 需求                               |
+| -------------- | -------------------------------- |
+| 最低可跑（Q4，默认上下文） | **6 GB 显存**，或 6–8 GB 系统内存（纯 CPU） |
+| 舒适体验（Q4，长上下文）  | 8 GB 显存左右                        |
+| Q8 量化          | 模型约 5 GB，建议 8 GB 显存              |
+
+说明：
+- 门槛很低：8 GB 内存、没有独显的轻薄本就能跑起来，CPU 推理速度也还可用
+- KV cache 开销比 9B 小：调大上下文时显存增长更温和，16 GB 显存的卡跑 Q8 + 长上下文都很宽裕
+- 跑 RAG 再加 1 GB 左右：留给 embedding 模型（如 nomic-embed-text）
+
+和 9B 对比一下选择：
+|      | qwen3.5:4b    | qwen3.5:9b       |
+| ---- | ------------- | ---------------- |
+| 模型文件 | ~3 GB         | ~6 GB            |
+| 最低显存 | 6 GB          | 8 GB             |
+| 适合   | 轻薄本、日常问答、简单代码 | 有 8GB+ 显卡、追求更好质量 |
+
+简单说：有 8 GB 以上显存就直接上 9b，质量明显更好；只有核显/轻薄本就 4b，够用且流畅。
+
+ollama pull 下载的模型存在 Ollama 的模型目录里，路径因操作系统而异
+| 系统        | 默认路径                                 |
+| --------- | ------------------------------------ |
+| Windows   | `C:\Users\<用户名>\.ollama\models`      |
+| macOS     | `~/.ollama/models`                   |
+| Linux     | `/usr/share/ollama/.ollama/models`   |
+| Docker 容器 | `/root/.ollama/models`（如果挂载了卷则在挂载位置） |
+
+.ollama 内部结构：
+```ini
+.ollama/models/
+├── manifests/          # 模型清单（记录标签、层信息）
+│   └── registry.ollama.ai/library/qwen3.5/9b
+└── blobs/              # 实际的模型权重文件（大文件都在这里）
+    └── sha256-xxxxx...
+```
+例如：上面的qwen2.5放在`/.ollama/models/manifests/registry.ollama.ai/library/qwen2.5` 目录中
+
+几点实用说明：
+- 实际占空间的是 blobs/ 目录：qwen3.5:9b 那 ~6 GB 主要是一个以 sha256- 开头的 blob 文件。不同模型如果共享某些层，blob 是去重存储的，不会重复占空间。
+- 想换存储位置（比如 C 盘不够大，挪到 D 盘）：设置环境变量 OLLAMA_MODELS
+  - Windows：系统环境变量添加 OLLAMA_MODELS=D:\ollama\models，然后重启 Ollama
+  - Linux/macOS：export OLLAMA_MODELS=/data/ollama/models（写进 shell 配置或 systemd service 的 Environment=）
+- 已下载的模型直接剪切整个 models 文件夹过去即可，不用重新拉取
+- 查看已下载模型：ollama list 会列出名称、大小、修改时间；ollama show qwen3.5:9b 看详情
+- 删除模型释放空间：ollama rm qwen3.5:9b
 
 ### 4. 验证本地服务
-
+请求之前，先确保 `ollama serve` 已运行。下面是请求 `qwen2.5` 的示例：
 ```bash
 curl http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -119,6 +187,9 @@ curl http://localhost:11434/v1/chat/completions \
 ```
 
 如果能正常返回模型回复，说明本地 Ollama 部署成功。
+
+上面的 ollama 运行效果如下图：
+![ollama.png](ollama.png)
 
 ### 5. 在 llm-gateway 中使用
 
@@ -274,3 +345,55 @@ Kimi Code CLI 是一个运行在终端中的 AI Agent，帮助你完成软件开
 ## DeepSeek API
 
 - 文档：https://api-docs.deepseek.com/zh-cn/
+
+## ollama 本地知识库搭建
+Ollama 本身只负责跑模型，没有内置的知识库（RAG）功能，需要在它外面套一层检索增强工具。常用的三条路。
+- 方案一：Anything-LLM（最简单，纯图形界面，推荐新手）
+
+例如：免费开源桌面应用，专为"文档问答"场景设计
+1. 下载安装 Anything-LLM 桌面版
+2. 新建 Workspace（工作区），把 PDF / Word / Markdown / TXT 等文档拖进去，它会自动切分、向量化
+3. 在设置里选 LLM Provider 为 Ollama（它会自动发现本地已 pull 的模型，比如 qwen3.5:9b）
+4. Embedding 模型也可以用 Ollama 跑，建议拉一个。
+```shell
+ollama pull nomic-embed-text
+```
+然后直接在对话窗口里问，它就只基于你的文档回答。无需写任何代码。
+
+- 方案二：Open WebUI（体验更像 ChatGPT，支持联网+知识库）
+```shell
+docker run -d -p 3000:8080 \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  -v open-webui:/app/backend/data \
+  --name open-webui ghcr.io/open-webui/open-webui:main
+```
+打开 http://localhost:3000 后：
+
+1. 临时用：对话里输入 # 上传文件，单次会话内基于文件问答
+2. 长期知识库：后台 → Workspace → Knowledge 新建知识库，上传一批文档，对话时用 #知识库名 引用
+3. Embedding 同样建议用 Ollama 的 nomic-embed-text 或 bge-m3（中文效果好）
+
+- 方案三：自己写脚本（最灵活，几行代码）用 Ollama 的 embedding 接口 + 简单检索，Python 核心逻辑：
+```python
+import ollama
+
+# 1. 文档切块后算向量（一次性，可缓存）
+def embed(text):
+    return ollama.embed(model='nomic-embed-text', input=text)['embeddings'][0]
+
+# 2. 检索最相关的块，拼进 prompt
+context = "\n".join(最相关的文档块)
+ollama.chat(model='qwen3.5:9b', messages=[
+    {'role': 'system', 'content': '只依据以下资料回答，资料未涵盖就说不知道：\n' + context},
+    {'role': 'user', 'content': 用户问题}
+])
+```
+文档多的话再加个向量库（ChromaDB / FAISS）持久化。
+
+### 硬件建议
+- 本地跑 RAG 需要同时加载生成模型 + embedding 模型，nomic-embed-text 很小（~270MB），对前面说的显存影响不大
+- 中文文档为主的话 embedding 优先选 bge-m3
+```shell
+ollama pull bge-m3
+```
+一句话建议：不想折腾就装 Anything-LLM；已经在用 Docker 或想要更好对话体验就 Open WebUI；要集成进自己程序才走方案三。
