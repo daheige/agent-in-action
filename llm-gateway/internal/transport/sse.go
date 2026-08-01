@@ -8,13 +8,14 @@ import (
 	"strings"
 )
 
+// SSEEvent 表示一个 Server-Sent Events 事件。
 type SSEEvent struct {
 	Event string
 	ID    string
 	Data  []byte
 }
 
-// ParseSSE 解析sse内容
+// ParseSSE 从 reader 中解析 SSE 数据流，每解析出一个事件调用 onEvent。
 func ParseSSE(ctx context.Context, reader io.Reader, onEvent func(SSEEvent) error) error {
 	if reader == nil {
 		return fmt.Errorf("SSE reader 不能为空")

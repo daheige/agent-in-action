@@ -11,6 +11,7 @@ import (
 
 var errStreamDone = errors.New("stream done")
 
+// parseStreamEvent 解析单条 Claude SSE 事件，并更新 usage 累计。
 func parseStreamEvent(
 	data []byte,
 	usage *llm.Usage,
@@ -63,6 +64,7 @@ func parseStreamEvent(
 	return llm.StreamChunk{}, false, nil
 }
 
+// sendChunk 将 chunk 发送到 output 通道，ctx 取消时返回错误。
 func sendChunk(ctx context.Context, output chan<- llm.StreamChunk, chunk llm.StreamChunk) error {
 	select {
 	case <-ctx.Done():

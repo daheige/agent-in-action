@@ -10,6 +10,7 @@ import (
 	"agent-in-action/llm-gateway/internal/cost"
 )
 
+// ProviderConfig 保存单个 LLM Provider 的配置信息。
 type ProviderConfig struct {
 	Name        string
 	BaseURL     string
@@ -19,6 +20,7 @@ type ProviderConfig struct {
 	LatencyHint time.Duration
 }
 
+// Config 保存整个网关的运行时配置。
 type Config struct {
 	Providers map[string]ProviderConfig
 	Order     []string
@@ -26,6 +28,7 @@ type Config struct {
 	Stream    bool
 }
 
+// LoadSettings 根据是否为 DeepSeek 模式加载对应配置。
 func LoadSettings(isDeepseek bool) (Config, error) {
 	if isDeepseek {
 		return LoadConfig()
@@ -34,6 +37,7 @@ func LoadSettings(isDeepseek bool) (Config, error) {
 	return Load()
 }
 
+// LoadConfig 加载 DeepSeek 单 Provider 配置。
 func LoadConfig() (Config, error) {
 	providers := make(map[string]ProviderConfig)
 	deepSeek, err := loadProvider(
@@ -73,6 +77,7 @@ func LoadConfig() (Config, error) {
 	}, nil
 }
 
+// Load 加载完整的多 Provider 网关配置。
 func Load() (Config, error) {
 	providers := make(map[string]ProviderConfig)
 	deepSeek, err := loadProvider(
@@ -164,6 +169,7 @@ func Load() (Config, error) {
 	}, nil
 }
 
+// loadProvider 从环境变量加载指定前缀的 Provider 配置。
 func loadProvider(
 	name string,
 	prefix string,
@@ -214,6 +220,7 @@ func loadProvider(
 	}, nil
 }
 
+// parseOrder 解析 Provider 优先级顺序，并校验是否包含未知或重复的 Provider。
 func parseOrder(value string, providers map[string]ProviderConfig) ([]string, error) {
 	if strings.TrimSpace(value) == "" {
 		value = "deepseek,doubao,claude,gemini,ollama"
@@ -255,6 +262,7 @@ func parseOrder(value string, providers map[string]ProviderConfig) ([]string, er
 	return order, nil
 }
 
+// parseFloatEnv 解析非负浮点数环境变量，为空时返回 0。
 func parseFloatEnv(name string) (float64, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -267,6 +275,7 @@ func parseFloatEnv(name string) (float64, error) {
 	return parsed, nil
 }
 
+// parseMillisecondsEnv 解析非负整数毫秒环境变量并转为 Duration。
 func parseMillisecondsEnv(name string) (time.Duration, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -279,6 +288,7 @@ func parseMillisecondsEnv(name string) (time.Duration, error) {
 	return time.Duration(parsed) * time.Millisecond, nil
 }
 
+// parseBoolEnv 解析布尔环境变量，为空时返回 fallback。
 func parseBoolEnv(name string, fallback bool) (bool, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {

@@ -23,6 +23,7 @@ import (
 
 const defaultTimeout = 5 * time.Minute
 
+// main 加载环境变量并执行命令行 LLM 调用。
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -35,6 +36,7 @@ func main() {
 	}
 }
 
+// run 解析命令行参数，构建 Router 并执行聊天或流式调用。
 func run() error {
 	config, err := appconfig.Load()
 	// config, err := appconfig.LoadConfig()
@@ -117,6 +119,7 @@ func run() error {
 	return runChat(ctx, modelRouter, request)
 }
 
+// runChat 执行非流式聊天并打印结果与统计信息。
 func runChat(
 	ctx context.Context,
 	modelRouter *router.Router,
@@ -139,6 +142,7 @@ func runChat(
 	return nil
 }
 
+// runStream 执行流式聊天并打印结果与统计信息。
 func runStream(
 	ctx context.Context,
 	modelRouter *router.Router,
@@ -177,6 +181,7 @@ func runStream(
 	return nil
 }
 
+// printSummary 打印 Provider、模型、token、费用与延迟统计信息。
 func printSummary(
 	providerName string,
 	model string,

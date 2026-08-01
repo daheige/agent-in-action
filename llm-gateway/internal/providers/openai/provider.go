@@ -15,15 +15,17 @@ import (
 	"agent-in-action/llm-gateway/internal/transport"
 )
 
+// Config 是创建 OpenAI 兼容 Provider 所需的配置。
 type Config struct {
 	Name         string            // provider 名字，例如: kimi
 	BaseURL      string            // base_url
 	APIKey       string            // apikey
 	DefaultModel string            // 默认模型
 	Capabilities llm.Capability    // Streaming 相关参数
-	Client       *transport.Client // 经过封装后的http client
+	Client       *transport.Client // 经过封装后的 http client
 }
 
+// Provider 实现 OpenAI 兼容协议的 LLM Provider。
 type Provider struct {
 	name         string
 	baseURL      string
@@ -33,6 +35,7 @@ type Provider struct {
 	client       *transport.Client
 }
 
+// New 创建并校验一个新的 OpenAI 兼容 Provider。
 func New(config Config) (*Provider, error) {
 	config.Name = strings.TrimSpace(config.Name)
 	config.BaseURL = strings.TrimRight(strings.TrimSpace(config.BaseURL), "/")
@@ -63,6 +66,7 @@ func New(config Config) (*Provider, error) {
 	}, nil
 }
 
+// validateBaseURL 校验 base URL 是否为合法的 http/https URL。
 func validateBaseURL(value string) error {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
@@ -71,18 +75,22 @@ func validateBaseURL(value string) error {
 	return nil
 }
 
+// Name 返回 Provider 名称。
 func (provider *Provider) Name() string {
 	return provider.name
 }
 
+// DefaultModel 返回 Provider 的默认模型。
 func (provider *Provider) DefaultModel() string {
 	return provider.defaultModel
 }
 
+// Capabilities 返回 Provider 支持的能力。
 func (provider *Provider) Capabilities() llm.Capability {
 	return provider.capabilities
 }
 
+// chatRequest 表示发送给 OpenAI 兼容接口的请求结构。
 type chatRequest struct {
 	Model         string         `json:"model"`
 	Messages      []llm.Message  `json:"messages"`
@@ -92,10 +100,12 @@ type chatRequest struct {
 	StreamOptions *streamOptions `json:"stream_options,omitempty"`
 }
 
+// streamOptions 控制流式响应中是否包含 usage 信息。
 type streamOptions struct {
 	IncludeUsage bool `json:"include_usage"`
 }
 
+// chatResponse 表示 OpenAI 兼容接口的非流式响应结构。
 type chatResponse struct {
 	Model   string `json:"model"`
 	Choices []struct {
@@ -107,11 +117,13 @@ type chatResponse struct {
 	Usage usage `json:"usage"`
 }
 
+// usage 表示 OpenAI 兼容接口返回的 token 使用量。
 type usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 }
 
+// Chat 执行非流式聊天请求。
 func (provider *Provider) Chat(ctx context.Context, request llm.ChatRequest) (*llm.ChatResponse, error) {
 	response, err := provider.doRequest(ctx, request, false)
 	if err != nil {
@@ -142,6 +154,7 @@ func (provider *Provider) Chat(ctx context.Context, request llm.ChatRequest) (*l
 	}, nil
 }
 
+// ChatStream 执行流式聊天请求并返回流数据通道。
 func (provider *Provider) ChatStream(
 	ctx context.Context,
 	request llm.ChatRequest,
@@ -189,6 +202,7 @@ func (provider *Provider) ChatStream(
 	return output, nil
 }
 
+// doRequest 构建并发送 chat/completions 请求，stream 控制是否请求流式响应。
 func (provider *Provider) doRequest(
 	ctx context.Context,
 	request llm.ChatRequest,
@@ -251,6 +265,7 @@ func (provider *Provider) doRequest(
 	return response, nil
 }
 
+// parseAPIError 解析 OpenAI 兼容接口返回的错误响应为 APIError。
 func parseAPIError(providerName string, response *http.Response) error {
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 64<<10))
 	if readErr != nil {

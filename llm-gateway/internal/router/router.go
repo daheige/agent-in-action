@@ -14,6 +14,7 @@ import (
 	"agent-in-action/llm-gateway/internal/llm"
 )
 
+// Candidate 表示一个可供路由选择的 Provider 候选。
 type Candidate struct {
 	Provider    llm.Provider
 	Pricing     cost.Pricing
@@ -21,17 +22,20 @@ type Candidate struct {
 	index       int
 }
 
+// Stats 保存某个 Provider 的历史延迟统计。
 type Stats struct {
 	Count int
 	P50   time.Duration
 	P95   time.Duration
 }
 
+// Strategy 定义 Provider 排序策略。
 type Strategy interface {
 	Name() string
 	Order(candidates []Candidate, stats map[string]Stats) []Candidate
 }
 
+// Result 表示一次非流式路由调用的结果。
 type Result struct {
 	Response *llm.ChatResponse
 	Provider string
@@ -39,12 +43,14 @@ type Result struct {
 	Duration time.Duration
 }
 
+// StreamResult 表示一次流式路由调用的结果。
 type StreamResult struct {
 	Chunks   <-chan llm.StreamChunk
 	Provider string
 	Pricing  cost.Pricing
 }
 
+// Router 根据策略在多个 Provider 之间进行路由与故障转移。
 type Router struct {
 	candidates []Candidate
 	strategy   Strategy
@@ -53,6 +59,7 @@ type Router struct {
 	samples map[string][]time.Duration
 }
 
+// New 使用指定策略和候选 Provider 创建 Router。
 func New(strategy Strategy, candidates ...Candidate) (*Router, error) {
 	if strategy == nil {
 		return nil, errors.New("router strategy 不能为空")
@@ -89,6 +96,7 @@ func New(strategy Strategy, candidates ...Candidate) (*Router, error) {
 	}, nil
 }
 
+// Chat 按策略顺序尝试调用 Provider，返回第一个成功结果；全部失败时返回聚合错误。
 func (router *Router) Chat(ctx context.Context, request llm.ChatRequest) (*Result, error) {
 	if err := llm.ValidateRequest(request); err != nil {
 		return nil, err
@@ -123,6 +131,7 @@ func (router *Router) Chat(ctx context.Context, request llm.ChatRequest) (*Resul
 	return nil, fmt.Errorf("所有 Provider 均失败: %w", errors.Join(providerErrors...))
 }
 
+// ChatStream 按策略顺序尝试建立流式调用，返回第一个成功的流结果。
 func (router *Router) ChatStream(
 	ctx context.Context,
 	request llm.ChatRequest,
@@ -187,10 +196,12 @@ func (router *Router) ChatStream(
 	return nil, fmt.Errorf("所有 Provider 均无法建立流: %w", errors.Join(providerErrors...))
 }
 
+// StrategyName 返回当前使用的路由策略名称。
 func (router *Router) StrategyName() string {
 	return router.strategy.Name()
 }
 
+// Stats 返回每个 Provider 的历史延迟统计快照。
 func (router *Router) Stats() map[string]Stats {
 	router.mu.Lock()
 	defer router.mu.Unlock()
@@ -206,6 +217,7 @@ func (router *Router) Stats() map[string]Stats {
 
 const maxSamples = 256
 
+// record 记录一次 Provider 调用耗时，用于后续延迟统计。
 func (router *Router) record(providerName string, duration time.Duration) {
 	router.mu.Lock()
 	defer router.mu.Unlock()
@@ -218,6 +230,7 @@ func (router *Router) record(providerName string, duration time.Duration) {
 	router.samples[providerName] = samples
 }
 
+// calculateStats 计算样本的 P50/P95 延迟统计。
 func calculateStats(samples []time.Duration) Stats {
 	if len(samples) == 0 {
 		return Stats{}
@@ -230,6 +243,7 @@ func calculateStats(samples []time.Duration) Stats {
 	}
 }
 
+// percentile 从已排序的样本中计算指定分位数。
 func percentile(sorted []time.Duration, quantile float64) time.Duration {
 	if len(sorted) == 0 {
 		return 0

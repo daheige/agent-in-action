@@ -7,10 +7,11 @@ import (
 	"time"
 )
 
-// Schema 在真实业务中的很多场景下（意图识别、任务规划、路由决策、工具调用参数），
-// 我们并不希望模型返回自然语言结果，而是希望拿到更稳定的结构化结果，
-// 通常是约定一个 JSON 格式的返回结构。手写 JSON Schema 冗长，
-// 也容易和 Go 结构体不同步。更好的做法是用反射从结构体自动生成。
+// Schema 表示从 Go 类型反射生成的 JSON Schema 描述。
+//
+// 在真实业务场景（意图识别、任务规划、路由决策、工具调用参数）中，
+// 我们通常希望模型返回稳定的结构化 JSON。手写 JSON Schema 冗长且容易与 Go 结构体不同步，
+// 因此通过反射从 Go 结构体自动生成 Schema 是更可靠的做法。
 type Schema struct {
 	Type                 string             `json:"type,omitempty"`
 	Description          string             `json:"description,omitempty"`
@@ -23,6 +24,7 @@ type Schema struct {
 
 var timeType = reflect.TypeOf(time.Time{})
 
+// Generate 从任意 Go 值（通常为结构体实例或指针）生成对应的 JSON Schema。
 func Generate(value any) (*Schema, error) {
 	if value == nil {
 		return nil, fmt.Errorf("不能为 nil 生成 JSON Schema")
@@ -30,6 +32,7 @@ func Generate(value any) (*Schema, error) {
 	return generateType(reflect.TypeOf(value), make(map[reflect.Type]bool))
 }
 
+// generateType 根据反射类型生成对应的 Schema，visiting 用于检测循环类型。
 func generateType(t reflect.Type, visiting map[reflect.Type]bool) (*Schema, error) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
@@ -76,6 +79,7 @@ func generateType(t reflect.Type, visiting map[reflect.Type]bool) (*Schema, erro
 	}
 }
 
+// generateStruct 从结构体类型生成 object 类型的 Schema。
 func generateStruct(t reflect.Type, visiting map[reflect.Type]bool) (*Schema, error) {
 	result := &Schema{
 		Type:       "object",
@@ -115,6 +119,7 @@ func generateStruct(t reflect.Type, visiting map[reflect.Type]bool) (*Schema, er
 	return result, nil
 }
 
+// parseJSONTag 解析结构体字段的 json tag，返回序列化名称、是否 omitempty 以及是否忽略。
 func parseJSONTag(field reflect.StructField) (name string, omitEmpty bool, skip bool) {
 	name = field.Name
 	tag := field.Tag.Get("json")

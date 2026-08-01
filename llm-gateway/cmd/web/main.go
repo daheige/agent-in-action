@@ -24,6 +24,7 @@ const (
 	defaultShutdownTimeout = 30 * time.Second
 )
 
+// main 加载环境变量并启动 HTTP 网关服务。
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("未加载 .env 文件或文件不存在")
@@ -34,6 +35,7 @@ func main() {
 	}
 }
 
+// run 加载配置、构建 Router 并启动支持优雅关闭的 HTTP 服务。
 func run() error {
 	config, err := appconfig.Load()
 	if err != nil {
@@ -84,6 +86,7 @@ func run() error {
 	return nil
 }
 
+// getEnv 获取环境变量，为空时返回 fallback。
 func getEnv(key, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 		return value
@@ -91,6 +94,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+// parseDurationEnv 解析时间类型环境变量，无效时使用 fallback。
 func parseDurationEnv(key string, fallback time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -108,6 +112,7 @@ func parseDurationEnv(key string, fallback time.Duration) time.Duration {
 	return duration
 }
 
+// parseCORSOrigins 将逗号分隔的 Origin 字符串解析为切片。
 func parseCORSOrigins(value string) []string {
 	value = strings.TrimSpace(value)
 	if value == "" {

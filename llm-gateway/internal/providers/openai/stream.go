@@ -11,7 +11,7 @@ import (
 
 var errStreamDone = errors.New("stream done")
 
-// StreamData stream 数据结构体
+// StreamData 表示 OpenAI 兼容流接口返回的单条事件数据结构。
 type StreamData struct {
 	Choices []struct {
 		Delta struct {
@@ -24,6 +24,7 @@ type StreamData struct {
 	} `json:"error"`
 }
 
+// parseStreamEvent 解析单条 SSE 数据为 StreamChunk，返回是否已完成或出错。
 func parseStreamEvent(data []byte) (llm.StreamChunk, bool, error) {
 	if string(data) == "[DONE]" {
 		return llm.StreamChunk{}, true, nil
@@ -50,6 +51,7 @@ func parseStreamEvent(data []byte) (llm.StreamChunk, bool, error) {
 	return chunk, false, nil
 }
 
+// sendChunk 将 chunk 发送到 output 通道，ctx 取消时返回错误。
 func sendChunk(ctx context.Context, output chan<- llm.StreamChunk, chunk llm.StreamChunk) error {
 	select {
 	case <-ctx.Done():

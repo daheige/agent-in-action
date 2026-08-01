@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// HTTPConfig 保存底层 HTTP 传输层的配置。
 type HTTPConfig struct {
 	DialTimeout         time.Duration
 	KeepAlive           time.Duration
@@ -21,6 +22,7 @@ type HTTPConfig struct {
 	TLSHandshakeTimeout time.Duration
 }
 
+// DefaultHTTPConfig 返回默认的 HTTP 传输层配置。
 func DefaultHTTPConfig() HTTPConfig {
 	return HTTPConfig{
 		DialTimeout:         5 * time.Second,
@@ -32,16 +34,20 @@ func DefaultHTTPConfig() HTTPConfig {
 	}
 }
 
+// HTTPOption 用于自定义 HTTPConfig 的选项函数。
 type HTTPOption func(*HTTPConfig)
 
+// WithDialTimeout 设置拨号超时。
 func WithDialTimeout(timeout time.Duration) HTTPOption {
 	return func(config *HTTPConfig) { config.DialTimeout = timeout }
 }
 
+// WithMaxIdleConnsPerHost 设置每个主机的最大空闲连接数。
 func WithMaxIdleConnsPerHost(maximum int) HTTPOption {
 	return func(config *HTTPConfig) { config.MaxIdleConnsPerHost = maximum }
 }
 
+// newTransport 根据 HTTPConfig 创建 http.Transport。
 func newTransport(config HTTPConfig) *http.Transport {
 	return &http.Transport{
 		DialContext: (&net.Dialer{
@@ -56,6 +62,7 @@ func newTransport(config HTTPConfig) *http.Transport {
 	}
 }
 
+// NewHTTPClient 创建配置好传输层的 http.Client。
 func NewHTTPClient(options ...HTTPOption) *http.Client {
 	config := DefaultHTTPConfig()
 	for _, option := range options {
@@ -64,14 +71,14 @@ func NewHTTPClient(options ...HTTPOption) *http.Client {
 	return &http.Client{Transport: newTransport(config)}
 }
 
-// 重试配置
+// RetryConfig 保存 HTTP 请求的重试策略。
 type RetryConfig struct {
 	MaxRetries int           // 最大重试次数
 	BaseDelay  time.Duration // 基本延迟时间
 	MaxDelay   time.Duration // 最大延迟时间
 }
 
-// DefaultRetryConfig 默认配置
+// DefaultRetryConfig 返回默认的重试策略配置。
 func DefaultRetryConfig() RetryConfig {
 	return RetryConfig{
 		MaxRetries: 3,
@@ -80,30 +87,37 @@ func DefaultRetryConfig() RetryConfig {
 	}
 }
 
+// Limiter 定义速率限制器接口。
 type Limiter interface {
 	Wait(context.Context) error
 }
 
+// Client 是带重试、限流功能的 HTTP 客户端封装。
 type Client struct {
 	httpClient *http.Client
 	retry      RetryConfig
 	limiter    Limiter
 }
 
+// Option 用于自定义 Client 的选项函数。
 type Option func(*Client)
 
+// WithRetry 设置重试策略。
 func WithRetry(config RetryConfig) Option {
 	return func(client *Client) { client.retry = config }
 }
 
+// WithLimiter 设置请求前的速率限制器。
 func WithLimiter(limiter Limiter) Option {
 	return func(client *Client) { client.limiter = limiter }
 }
 
+// WithHTTPOptions 使用 HTTPOption 自定义底层 HTTP 客户端。
 func WithHTTPOptions(options ...HTTPOption) Option {
 	return func(client *Client) { client.httpClient = NewHTTPClient(options...) }
 }
 
+// WithHTTPClient 直接注入自定义的 http.Client。
 func WithHTTPClient(httpClient *http.Client) Option {
 	return func(client *Client) {
 		if httpClient != nil {
@@ -112,6 +126,7 @@ func WithHTTPClient(httpClient *http.Client) Option {
 	}
 }
 
+// NewClient 创建带有默认重试策略的 HTTP 客户端。
 func NewClient(options ...Option) *Client {
 	client := &Client{
 		httpClient: NewHTTPClient(),
@@ -125,6 +140,7 @@ func NewClient(options ...Option) *Client {
 	return client
 }
 
+// Do 执行 HTTP 请求，并在可重试错误时按配置自动重试。
 func (client *Client) Do(request *http.Request) (*http.Response, error) {
 	if request == nil {
 		return nil, errors.New("request 不能为空")
@@ -181,6 +197,7 @@ func (client *Client) Do(request *http.Request) (*http.Response, error) {
 	return nil, fmt.Errorf("重试 %d 次后仍失败: %w", client.retry.MaxRetries, lastErr)
 }
 
+// requestForAttempt 为第 attempt 次重试构造可重放的请求副本。
 func requestForAttempt(request *http.Request, attempt int) (*http.Request, error) {
 	if attempt == 0 {
 		return request, nil
@@ -201,10 +218,12 @@ func requestForAttempt(request *http.Request, attempt int) (*http.Request, error
 	return cloned, nil
 }
 
+// retryableStatus 判断状态码是否属于可重试错误。
 func retryableStatus(statusCode int) bool {
 	return statusCode == http.StatusTooManyRequests || statusCode >= http.StatusInternalServerError
 }
 
+// normalizeRetryConfig 规范化重试配置，确保各字段为合理值。
 func normalizeRetryConfig(config RetryConfig) RetryConfig {
 	if config.MaxRetries < 0 {
 		config.MaxRetries = 0
@@ -221,6 +240,7 @@ func normalizeRetryConfig(config RetryConfig) RetryConfig {
 	return config
 }
 
+// backoff 根据重试次数计算指数退避加抖动的等待时间。
 func backoff(attempt int, config RetryConfig) time.Duration {
 	if config.BaseDelay <= 0 {
 		return 0
@@ -245,10 +265,12 @@ func backoff(attempt int, config RetryConfig) time.Duration {
 	return delay - delay/10 + time.Duration(rand.Int63n(int64(jitterRange)))
 }
 
+// retryAfter 根据响应头 Retry-After 计算需要等待的时间。
 func retryAfter(response *http.Response) time.Duration {
 	return retryAfterAt(response, time.Now())
 }
 
+// retryAfterAt 根据 Retry-After 头与当前时间计算等待时间，便于测试。
 func retryAfterAt(response *http.Response, now time.Time) time.Duration {
 	if response == nil {
 		return 0
@@ -274,6 +296,7 @@ func retryAfterAt(response *http.Response, now time.Time) time.Duration {
 	return 0
 }
 
+// sleep 在 ctx 取消前等待 delay，被取消时返回 false。
 func sleep(ctx context.Context, delay time.Duration) bool {
 	if delay <= 0 {
 		return ctx.Err() == nil

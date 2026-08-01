@@ -11,6 +11,7 @@ import (
 
 var errStreamDone = errors.New("stream done")
 
+// parseStreamEvent 解析单条 Gemini SSE 事件为 StreamChunk，返回是否已完成。
 func parseStreamEvent(data []byte) (llm.StreamChunk, bool, error) {
 	var payload generateContentResponse
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -39,6 +40,7 @@ func parseStreamEvent(data []byte) (llm.StreamChunk, bool, error) {
 	return chunk, candidate.FinishReason != "", nil
 }
 
+// sendChunk 将 chunk 发送到 output 通道，ctx 取消时返回错误。
 func sendChunk(ctx context.Context, output chan<- llm.StreamChunk, chunk llm.StreamChunk) error {
 	select {
 	case <-ctx.Done():

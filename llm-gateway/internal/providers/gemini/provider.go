@@ -17,6 +17,7 @@ import (
 
 const defaultBaseURL = "https://generativelanguage.googleapis.com/v1beta"
 
+// Config 是创建 Gemini Provider 所需的配置。
 type Config struct {
 	Name         string
 	BaseURL      string
@@ -26,6 +27,7 @@ type Config struct {
 	Client       *transport.Client
 }
 
+// Provider 实现 Google Gemini API 的 LLM Provider。
 type Provider struct {
 	name         string
 	baseURL      string
@@ -35,6 +37,7 @@ type Provider struct {
 	client       *transport.Client
 }
 
+// New 创建并校验一个新的 Gemini Provider。
 func New(config Config) (*Provider, error) {
 	if strings.TrimSpace(config.Name) == "" {
 		config.Name = "gemini"
@@ -70,38 +73,46 @@ func New(config Config) (*Provider, error) {
 	}, nil
 }
 
+// Name 返回 Provider 名称。
 func (provider *Provider) Name() string {
 	return provider.name
 }
 
+// DefaultModel 返回 Provider 的默认模型。
 func (provider *Provider) DefaultModel() string {
 	return provider.defaultModel
 }
 
+// Capabilities 返回 Provider 支持的能力。
 func (provider *Provider) Capabilities() llm.Capability {
 	return provider.capabilities
 }
 
+// generateContentRequest 表示 Gemini generateContent 请求结构。
 type generateContentRequest struct {
 	Contents          []content         `json:"contents"`
 	SystemInstruction *content          `json:"systemInstruction,omitempty"`
 	GenerationConfig  *generationConfig `json:"generationConfig,omitempty"`
 }
 
+// generationConfig 表示 Gemini 生成参数配置。
 type generationConfig struct {
 	Temperature     *float64 `json:"temperature,omitempty"`
 	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
 }
 
+// content 表示 Gemini 对话中的内容结构。
 type content struct {
 	Role  string `json:"role,omitempty"`
 	Parts []part `json:"parts"`
 }
 
+// part 表示 content 中的文本片段。
 type part struct {
 	Text string `json:"text,omitempty"`
 }
 
+// generateContentResponse 表示 Gemini generateContent 响应结构。
 type generateContentResponse struct {
 	Candidates []struct {
 		Content       content `json:"content"`
@@ -118,12 +129,14 @@ type generateContentResponse struct {
 	} `json:"error"`
 }
 
+// usageMetadata 表示 Gemini 返回的 token 使用元数据。
 type usageMetadata struct {
 	PromptTokenCount     int `json:"promptTokenCount"`
 	CandidatesTokenCount int `json:"candidatesTokenCount"`
 	TotalTokenCount      int `json:"totalTokenCount"`
 }
 
+// Chat 执行非流式 Gemini 聊天请求。
 func (provider *Provider) Chat(ctx context.Context, request llm.ChatRequest) (*llm.ChatResponse, error) {
 	response, err := provider.doRequest(ctx, request, false)
 	if err != nil {
@@ -170,6 +183,7 @@ func (provider *Provider) Chat(ctx context.Context, request llm.ChatRequest) (*l
 	}, nil
 }
 
+// ChatStream 执行流式 Gemini 聊天请求并返回流数据通道。
 func (provider *Provider) ChatStream(
 	ctx context.Context,
 	request llm.ChatRequest,
@@ -216,6 +230,7 @@ func (provider *Provider) ChatStream(
 	return output, nil
 }
 
+// doRequest 构建并发送 Gemini generateContent 请求。
 func (provider *Provider) doRequest(
 	ctx context.Context,
 	request llm.ChatRequest,
@@ -257,6 +272,7 @@ func (provider *Provider) doRequest(
 	return response, nil
 }
 
+// adaptRequest 将通用 llm.ChatRequest 适配为 Gemini 请求格式，返回请求体和模型名。
 func (provider *Provider) adaptRequest(request llm.ChatRequest) (generateContentRequest, string, error) {
 	if err := llm.ValidateRequest(request); err != nil {
 		return generateContentRequest{}, "", err
@@ -306,6 +322,7 @@ func (provider *Provider) adaptRequest(request llm.ChatRequest) (generateContent
 	return wireRequest, model, nil
 }
 
+// endpoint 根据模型和是否流式生成 Gemini API 端点 URL。
 func (provider *Provider) endpoint(model string, stream bool) (string, error) {
 	modelName := strings.TrimSpace(model)
 	modelName = strings.TrimPrefix(modelName, "models/")
@@ -330,6 +347,7 @@ func (provider *Provider) endpoint(model string, stream bool) (string, error) {
 	return parsed.String(), nil
 }
 
+// textFromContent 从 content 中提取所有文本片段。
 func textFromContent(value content) string {
 	var builder strings.Builder
 	for _, part := range value.Parts {
@@ -338,6 +356,7 @@ func textFromContent(value content) string {
 	return builder.String()
 }
 
+// usageFromMetadata 将 Gemini usageMetadata 转换为通用 llm.Usage。
 func usageFromMetadata(metadata usageMetadata) llm.Usage {
 	outputTokens := metadata.CandidatesTokenCount
 	if outputTokens == 0 && metadata.TotalTokenCount > metadata.PromptTokenCount {
@@ -349,6 +368,7 @@ func usageFromMetadata(metadata usageMetadata) llm.Usage {
 	}
 }
 
+// parseAPIError 解析 Gemini 错误响应为 APIError。
 func parseAPIError(providerName string, response *http.Response) error {
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 64<<10))
 	if readErr != nil {

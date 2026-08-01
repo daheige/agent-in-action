@@ -12,6 +12,7 @@ import (
 	"agent-in-action/llm-gateway/internal/transport"
 )
 
+// BuildRouter 根据配置构建带有策略的 Router。
 func BuildRouter(config appconfig.Config) (*router.Router, error) {
 	candidates, err := BuildAll(config)
 	if err != nil {
@@ -24,7 +25,7 @@ func BuildRouter(config appconfig.Config) (*router.Router, error) {
 	return router.New(strategy, candidates...)
 }
 
-// BuildAll 按配置顺序构造 Provider，返回 slice 以保留 Priority 语义。
+// BuildAll 按配置顺序构造所有启用的 Provider 候选，返回 slice 以保留 Priority 语义。
 func BuildAll(config appconfig.Config) ([]router.Candidate, error) {
 	httpClient := transport.NewClient()
 	candidates := make([]router.Candidate, 0, len(config.Order))
@@ -86,6 +87,7 @@ func BuildAll(config appconfig.Config) ([]router.Candidate, error) {
 	return candidates, nil
 }
 
+// BuildStrategy 根据名称创建对应的路由策略实例。
 func BuildStrategy(name string) (router.Strategy, error) {
 	switch name {
 	case "priority":

@@ -17,6 +17,7 @@ import (
 
 const defaultAnthropicVersion = "2023-06-01"
 
+// Config 是创建 Claude Provider 所需的配置。
 type Config struct {
 	Name             string
 	BaseURL          string
@@ -27,6 +28,7 @@ type Config struct {
 	Client           *transport.Client
 }
 
+// Provider 实现 Anthropic Claude API 的 LLM Provider。
 type Provider struct {
 	name             string
 	baseURL          string
@@ -37,6 +39,7 @@ type Provider struct {
 	client           *transport.Client
 }
 
+// New 创建并校验一个新的 Claude Provider。
 func New(config Config) (*Provider, error) {
 	if strings.TrimSpace(config.Name) == "" {
 		config.Name = "claude"
@@ -76,23 +79,28 @@ func New(config Config) (*Provider, error) {
 	}, nil
 }
 
+// Name 返回 Provider 名称。
 func (provider *Provider) Name() string {
 	return provider.name
 }
 
+// DefaultModel 返回 Provider 的默认模型。
 func (provider *Provider) DefaultModel() string {
 	return provider.defaultModel
 }
 
+// Capabilities 返回 Provider 支持的能力。
 func (provider *Provider) Capabilities() llm.Capability {
 	return provider.capabilities
 }
 
+// anthropicMessage 表示 Claude API 的消息结构。
 type anthropicMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
+// anthropicRequest 表示发送给 Claude messages 接口的请求结构。
 type anthropicRequest struct {
 	Model       string             `json:"model"`
 	System      string             `json:"system,omitempty"`
@@ -102,6 +110,7 @@ type anthropicRequest struct {
 	Stream      bool               `json:"stream,omitempty"`
 }
 
+// anthropicResponse 表示 Claude messages 接口的响应结构。
 type anthropicResponse struct {
 	Model   string `json:"model"`
 	Content []struct {
@@ -115,6 +124,7 @@ type anthropicResponse struct {
 	} `json:"usage"`
 }
 
+// Chat 执行非流式 Claude 聊天请求。
 func (provider *Provider) Chat(ctx context.Context, request llm.ChatRequest) (*llm.ChatResponse, error) {
 	response, err := provider.doRequest(ctx, request, false)
 	if err != nil {
@@ -151,6 +161,7 @@ func (provider *Provider) Chat(ctx context.Context, request llm.ChatRequest) (*l
 	}, nil
 }
 
+// ChatStream 执行流式 Claude 聊天请求并返回流数据通道。
 func (provider *Provider) ChatStream(
 	ctx context.Context,
 	request llm.ChatRequest,
@@ -202,6 +213,7 @@ func (provider *Provider) ChatStream(
 	return output, nil
 }
 
+// doRequest 构建并发送 Claude messages 请求。
 func (provider *Provider) doRequest(
 	ctx context.Context,
 	request llm.ChatRequest,
@@ -244,6 +256,7 @@ func (provider *Provider) doRequest(
 	return response, nil
 }
 
+// adaptRequest 将通用 llm.ChatRequest 适配为 Claude 请求格式。
 func (provider *Provider) adaptRequest(
 	request llm.ChatRequest,
 	stream bool,
@@ -295,6 +308,7 @@ func (provider *Provider) adaptRequest(
 	}, nil
 }
 
+// parseAPIError 解析 Claude 错误响应为 APIError。
 func parseAPIError(providerName string, response *http.Response) error {
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 64<<10))
 	if readErr != nil {

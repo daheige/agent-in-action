@@ -22,7 +22,7 @@ type Server struct {
 	corsOrigins []string
 }
 
-// Option 配置 Server。
+// Option 用于自定义 Server 的选项函数。
 type Option func(*Server)
 
 // WithTimeout 设置每个请求的最大处理时间。
@@ -35,7 +35,7 @@ func WithCORS(origins []string) Option {
 	return func(s *Server) { s.corsOrigins = origins }
 }
 
-// New 创建 HTTP Server。
+// New 创建 HTTP Server，可传入 Option 进行配置。
 func New(router *router.Router, opts ...Option) *Server {
 	server := &Server{
 		router:      router,
@@ -48,7 +48,7 @@ func New(router *router.Router, opts ...Option) *Server {
 	return server
 }
 
-// Handler 返回注册好路由的 http.Handler。
+// Handler 返回注册好路由并带有超时与 CORS 中间件的 http.Handler。
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/chat", s.handleChat)
@@ -68,6 +68,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // chatRequest 复用 llm.ChatRequest，不需要额外包装。
 type chatRequest = llm.ChatRequest
 
+// chatResponse 表示非流式聊天接口的响应结构。
 type chatResponse struct {
 	Provider     string   `json:"provider"`
 	Model        string   `json:"model,omitempty"`
@@ -78,21 +79,25 @@ type chatResponse struct {
 	DurationMs   int64    `json:"duration_ms"`
 }
 
+// usage 表示 token 使用量的响应字段。
 type usage struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`
 	TotalTokens  int `json:"total_tokens"`
 }
 
+// costInfo 表示费用估算的响应字段。
 type costInfo struct {
 	Estimated float64 `json:"estimated"`
 	Currency  string  `json:"currency"`
 }
 
+// errorResponse 表示错误响应结构。
 type errorResponse struct {
 	Error string `json:"error"`
 }
 
+// handleChat 处理 /chat 接口的非流式与流式请求。
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -127,6 +132,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	s.handleChatSync(ctx, w, req)
 }
 
+// handleChatSync 处理非流式聊天请求并写入 JSON 响应。
 func (s *Server) handleChatSync(ctx context.Context, w http.ResponseWriter, req llm.ChatRequest) {
 	result, err := s.router.Chat(ctx, req)
 	if err != nil {
@@ -158,6 +164,7 @@ func (s *Server) handleChatSync(ctx context.Context, w http.ResponseWriter, req 
 	writeJSON(w, http.StatusOK, response)
 }
 
+// handleStream 处理流式聊天请求并通过 SSE 推送结果。
 func (s *Server) handleStream(ctx context.Context, w http.ResponseWriter, req llm.ChatRequest) {
 	startedAt := time.Now()
 	result, err := s.router.ChatStream(ctx, req)
@@ -224,6 +231,7 @@ func (s *Server) handleStream(ctx context.Context, w http.ResponseWriter, req ll
 	flush.Flush()
 }
 
+// writeSSEEvent 将 event 编码为 JSON 并写入 SSE data 帧。
 func writeSSEEvent(w io.Writer, event any) error {
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -232,22 +240,25 @@ func writeSSEEvent(w io.Writer, event any) error {
 	return writeSSE(w, data)
 }
 
+// writeSSE 将 data 写入一行 SSE data 帧。
 func writeSSE(w io.Writer, data []byte) error {
 	_, err := fmt.Fprintf(w, "data: %s\n\n", data)
 	return err
 }
 
+// writeJSON 以 JSON 格式写入响应。
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
+// writeError 写入 JSON 格式的错误响应。
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, errorResponse{Error: message})
 }
 
-// timeoutMiddleware 为每个请求注入超时 context。
+// timeoutMiddleware 为每个请求注入 Server 级别的超时 context。
 func (s *Server) timeoutMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
@@ -256,7 +267,7 @@ func (s *Server) timeoutMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// corsMiddleware 根据配置的 Origin 列表添加 CORS 头。
+// corsMiddleware 根据配置的 Origin 列表为响应添加 CORS 头。
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	if len(s.corsOrigins) == 0 {
 		return next
@@ -290,6 +301,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// contains 判断字符串切片中是否包含指定值。
 func contains(list []string, value string) bool {
 	for _, item := range list {
 		if item == value {
