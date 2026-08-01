@@ -351,7 +351,7 @@ Ollama 本身只负责跑模型，没有内置的知识库（RAG）功能，需�
 - 方案一：Anything-LLM（最简单，纯图形界面，推荐新手）
 
 例如：免费开源桌面应用，专为"文档问答"场景设计
-1. 下载安装 Anything-LLM 桌面版
+1. 下载安装 Anything-LLM 桌面版，下载地址：https://anythingllm.com/download
 2. 新建 Workspace（工作区），把 PDF / Word / Markdown / TXT 等文档拖进去，它会自动切分、向量化
 3. 在设置里选 LLM Provider 为 Ollama（它会自动发现本地已 pull 的模型，比如 qwen3.5:9b）
 4. Embedding 模型也可以用 Ollama 跑，建议拉一个。
